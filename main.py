@@ -185,6 +185,12 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 
+class UserCreate(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+
 class PostCreate(BaseModel):
     title: str
     content: Optional[str] = None
@@ -292,6 +298,25 @@ def get_user(
     )
     if user is None:
         raise HTTPException(404, "User not found")
+    return UserOut.model_validate(user)
+
+
+@app.post("/users", response_model=UserOut, status_code=201, tags=["Users"])
+def create_user(
+    body: UserCreate,
+    db: Session = Depends(get_db),
+    _current_user: UserModel = Depends(get_current_user),
+):
+    if db.query(UserModel).filter(UserModel.email == body.email).first():
+        raise HTTPException(400, "Email already registered")
+    user = UserModel(
+        name=body.name,
+        email=body.email,
+        password_hash=_hash_password(body.password),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return UserOut.model_validate(user)
 
 
